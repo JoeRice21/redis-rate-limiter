@@ -1,13 +1,13 @@
 name: Deploy
-
 on:
   push:
     branches:
       - main
-
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.image.outputs.IMAGE }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,15 +19,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-       - name: Set image name
-        run: echo "IMAGE=ghcr.io/$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')/redis-rate-limiter" >> $GITHUB_ENV
+      - name: Set image name
+        id: image
+        run: echo "IMAGE=ghcr.io/$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')/redis-rate-limiter" >> $GITHUB_OUTPUT
 
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ env.IMAGE }}
+          tags: ${{ steps.image.outputs.IMAGE }}:latest
 
   deploy:
     runs-on: ubuntu-latest
@@ -45,7 +46,7 @@ jobs:
             cat > ~/apps/redis-rate-limiter/docker-compose.yml << 'EOF'
             services:
               app:
-                image: ${{ env.IMAGE }}
+                image: ${{ needs.build.outputs.image }}:latest
                 container_name: redis-rate-limiter
                 expose:
                   - "8080"
@@ -53,17 +54,15 @@ jobs:
                   - redis
                 environment:
                   - REDIS_ADDR=redis:6379
-                  - VIRTUAL_HOST=myapp.example.com
+                  - VIRTUAL_HOST=rrl.example.com
                   - VIRTUAL_PORT=8080
                 networks:
                   - proxy
                   - internal
-
               redis:
                 image: redis:alpine
                 networks:
                   - internal
-
             networks:
               proxy:
                 external: true
