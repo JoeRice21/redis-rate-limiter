@@ -1,0 +1,27 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH & Deploy
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.GCP_VM_IP }}
+          username: ${{ secrets.GCP_SSH_USER }}
+          key: ${{ secrets.GCP_SSH_KEY }}
+          script: |
+            cd ~/apps
+            if [ -d "App-JoeRice21-redis-rate-limiter" ]; then
+              cd myapp && git pull
+            else
+              git clone https://github.com/JoeRice21/redis-rate-limiter.git
+              cd myapp
+            fi
+            docker compose up -d --build
