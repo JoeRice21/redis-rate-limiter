@@ -59,19 +59,13 @@ jobs:
                   - redis
                 environment:
                   - REDIS_ADDR=redis:6379
-                  - VIRTUAL_HOST=rrl.example.com
-                  - VIRTUAL_PORT=8080
                 networks:
-                  - proxy
                   - internal
               redis:
                 image: redis:alpine
                 networks:
                   - internal
             networks:
-              proxy:
-                external: true
-                name: proxy
               internal:
                 driver: bridge
             EOF
