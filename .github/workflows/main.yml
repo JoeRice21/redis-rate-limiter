@@ -19,12 +19,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+       - name: Set image name
+        run: echo "IMAGE=ghcr.io/$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')/redis-rate-limiter" >> $GITHUB_ENV
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/redis-rate-limiter:latest
+          tags: ${{ env.IMAGE }}
 
   deploy:
     runs-on: ubuntu-latest
@@ -42,7 +45,7 @@ jobs:
             cat > ~/apps/redis-rate-limiter/docker-compose.yml << 'EOF'
             services:
               app:
-                image: ghcr.io/${{ github.repository_owner }}/redis-rate-limiter:latest
+                image: ${{ env.IMAGE }}
                 container_name: redis-rate-limiter
                 expose:
                   - "8080"
