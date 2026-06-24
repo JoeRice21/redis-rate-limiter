@@ -18,10 +18,10 @@ jobs:
           key: ${{ secrets.GCP_SSH_KEY }}
           script: |
             cd ~/apps
-            if [ -d "App-JoeRice21-redis-rate-limiter" ]; then
-              cd myapp && git pull
+            if [ -d "redis-rate-limiter" ]; then
+              cd redis-rate-limiter && git pull
             else
               git clone https://github.com/JoeRice21/redis-rate-limiter.git
-              cd myapp
+              cd redis-rate-limiter
             fi
             docker compose up -d --build
