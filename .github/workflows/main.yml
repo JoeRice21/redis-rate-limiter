@@ -6,9 +6,29 @@ on:
       - main
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/redis-rate-limiter:latest
+
   deploy:
     runs-on: ubuntu-latest
-
+    needs: build
     steps:
       - name: SSH & Deploy
         uses: appleboy/ssh-action@v1
@@ -16,12 +36,38 @@ jobs:
           host: ${{ secrets.GCP_VM_IP }}
           username: ${{ secrets.GCP_SSH_USER }}
           key: ${{ secrets.GCP_SSH_KEY }}
+          connect_timeout: 30s
           script: |
-            cd ~/apps
-            if [ -d "redis-rate-limiter" ]; then
-              cd redis-rate-limiter && git pull
-            else
-              git clone https://github.com/JoeRice21/redis-rate-limiter.git
-              cd redis-rate-limiter
-            fi
-            docker compose up -d --build
+            mkdir -p ~/apps/redis-rate-limiter
+            cat > ~/apps/redis-rate-limiter/docker-compose.yml << 'EOF'
+            services:
+              app:
+                image: ghcr.io/${{ github.repository_owner }}/redis-rate-limiter:latest
+                container_name: redis-rate-limiter
+                expose:
+                  - "8080"
+                depends_on:
+                  - redis
+                environment:
+                  - REDIS_ADDR=redis:6379
+                  - VIRTUAL_HOST=myapp.example.com
+                  - VIRTUAL_PORT=8080
+                networks:
+                  - proxy
+                  - internal
+
+              redis:
+                image: redis:alpine
+                networks:
+                  - internal
+
+            networks:
+              proxy:
+                external: true
+                name: proxy
+              internal:
+                driver: bridge
+            EOF
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose -f ~/apps/redis-rate-limiter/docker-compose.yml pull
+            docker compose -f ~/apps/redis-rate-limiter/docker-compose.yml up -d
